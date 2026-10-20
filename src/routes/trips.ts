@@ -4,7 +4,7 @@ import type { NewTrip } from "../types.js";
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
-/** Returns why `body` isn't a valid new trip, or null when it is. */
+/** Returns why `body` isn't a valid trip, or null when it is. */
 function validateNewTrip(body: Partial<NewTrip> | undefined): string | null {
   if (!body || typeof body.destination !== "string" || body.destination.trim() === "") {
     return "destination is required";
@@ -44,6 +44,35 @@ tripsRouter.post("/", (req, res) => {
     travelers: body!.travelers!,
   });
   res.status(201).json(trip);
+});
+
+tripsRouter.get("/:id", (req, res) => {
+  const trip = tripStore.get(req.params.id);
+  if (!trip) {
+    res.status(404).json({ error: "trip not found" });
+    return;
+  }
+  res.json(trip);
+});
+
+tripsRouter.put("/:id", (req, res) => {
+  const body = req.body as Partial<NewTrip> | undefined;
+  const problem = validateNewTrip(body);
+  if (problem) {
+    res.status(400).json({ error: problem });
+    return;
+  }
+  const trip = tripStore.update(req.params.id, {
+    destination: body!.destination!.trim(),
+    startDate: body!.startDate!,
+    endDate: body!.endDate!,
+    travelers: body!.travelers!,
+  });
+  if (!trip) {
+    res.status(404).json({ error: "trip not found" });
+    return;
+  }
+  res.json(trip);
 });
 
 tripsRouter.delete("/:id", (req, res) => {

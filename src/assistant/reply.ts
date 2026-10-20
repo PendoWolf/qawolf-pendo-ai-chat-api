@@ -1,37 +1,47 @@
-import type { IncomingChatMessage, Trip } from "../types.js";
+import Anthropic from "@anthropic-ai/sdk";
+import type { Account, IncomingChatMessage, Trip, User } from "../types.js";
+
+/** The model the Tripwise Assistant answers with. */
+export const ASSISTANT_MODEL = "claude-opus-5-5";
+
+// The SDK reads the key from the ANTHROPIC_API_KEY environment variable.
+const anthropic = new Anthropic();
+
+/** The assistant's instructions, with what it knows about the signed-in user and their upcoming trips. */
+function systemPrompt(user: User, account: Account, upcomingTrips: Trip[]): string {
+  const trips =
+    upcomingTrips.length === 0
+      ? "They have no upcoming trips yet."
+      : `Their upcoming trips:\n${upcomingTrips
+          .map((trip) => `- ${trip.destination}, ${trip.startDate} to ${trip.endDate}, ${trip.travelers} traveler(s)`)
+          .join("\n")}`;
+  return [
+    "You are the Tripwise Assistant, a travel-planning agent inside the Tripwise web app.",
+    "Help with itineraries, packing lists, budgets and cheaper alternatives. Keep answers short and practical.",
+    `You're talking to ${user.name} from ${account.name}.`,
+    trips,
+  ].join("\n");
+}
 
 /**
- * Writes the Tripwise Assistant's reply to the latest user message.
- *
- * This build answers from a small set of travel rules instead of calling a language model, so the API runs
- * with no model key. The route only depends on this function's signature, so a model-backed version can
- * replace it.
+ * Writes the Tripwise Assistant's reply to the conversation by sending it to a Claude model through the
+ * Anthropic SDK, and returns the reply's text.
  */
-export function writeAssistantReply(messages: IncomingChatMessage[], upcomingTrips: Trip[]): string {
-  const latest = [...messages].reverse().find((message) => message.role === "user");
-  const prompt = latest?.content.trim().toLowerCase() ?? "";
-  const nextTrip = upcomingTrips[0];
-
-  if (prompt === "") {
-    return "Hi! I'm the Tripwise Assistant. Ask me about itineraries, packing or cheaper places to go.";
+export async function writeAssistantReply(
+  messages: IncomingChatMessage[],
+  context: { user: User; account: Account; upcomingTrips: Trip[] },
+): Promise<string> {
+  const response = await anthropic.messages.create({
+    model: ASSISTANT_MODEL,
+    max_tokens: 2000,
+    system: systemPrompt(context.user, context.account, context.upcomingTrips),
+    messages: messages.map(({ role, content }) => ({ role, content })),
+  });
+  if (response.stop_reason === "refusal") {
+    return "Sorry, I can't help with that one. Ask me about another part of your trip.";
   }
-  if (prompt.includes("itinerary")) {
-    const place = nextTrip ? nextTrip.destination : "your destination";
-    return [
-      `Here's a simple 3-day plan for ${place}:`,
-      "Day 1: walk the old town and get your bearings.",
-      "Day 2: a museum in the morning and a food market in the afternoon.",
-      "Day 3: a half-day trip out of the city, back for dinner.",
-    ].join("\n");
-  }
-  if (prompt.includes("pack")) {
-    return "Pack layers, a waterproof jacket, comfortable walking shoes, a power adapter and a reusable water bottle.";
-  }
-  if (prompt.includes("cheap") || prompt.includes("budget") || prompt.includes("alternative")) {
-    return "Try shoulder season, fly midweek, and look at a nearby city with the same feel for a lower price, like Porto instead of Lisbon.";
-  }
-  if (nextTrip) {
-    return `Your next trip is ${nextTrip.destination} from ${nextTrip.startDate} to ${nextTrip.endDate}. What would you like to plan for it?`;
-  }
-  return "Tell me where you're going and when, and I'll help you plan it.";
+  return response.content
+    .flatMap((block) => (block.type === "text" ? [block.text] : []))
+    .join("\n")
+    .trim();
 }

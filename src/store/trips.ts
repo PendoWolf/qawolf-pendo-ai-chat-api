@@ -24,6 +24,16 @@ export const tripStore = {
     trips.set(id, created);
     return created;
   },
+  get(id: string): Trip | undefined {
+    return trips.get(id);
+  },
+  /** Replaces the trip's details, and returns undefined when there's none with that id. */
+  update(id: string, trip: NewTrip): Trip | undefined {
+    if (!trips.has(id)) return undefined;
+    const updated: Trip = { id, ...trip };
+    trips.set(id, updated);
+    return updated;
+  },
   /** Deletes the trip, and returns false when there was none with that id. */
   remove(id: string): boolean {
     return trips.delete(id);

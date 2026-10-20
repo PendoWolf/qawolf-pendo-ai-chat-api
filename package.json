@@ -2,7 +2,7 @@
   "name": "tripwise-api",
   "version": "1.0.0",
   "private": true,
-  "description": "The Tripwise API: trips and the Tripwise Assistant chat, the backend for the Tripwise web app.",
+  "description": "The Tripwise API: sign-in, users, accounts, trips and the Tripwise Assistant chat, the backend for the Tripwise web app.",
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
@@ -12,6 +12,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.131.0",
     "cors": "^2.8.5",
     "express": "^4.21.2"
   },
